@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!--
+    Apex Topups - Store Page
+    File: store.html
+
+    Description:
+      - Frontend-only store listing reading products from products.json (editable via GitHub).
+      - Renders product cards with image, price, description, and "Buy" button.
+      - Clicking "Buy" saves selected product to localStorage key "apex_selected_product" and navigates to payment.html.
+      - Supports search and category filter (client-side).
+      - Mobile-first, dark theme with orange highlights, card-based layout, smooth hover animations.
+      - Dynamically injects footer.html into #footer-container (graceful fallback included).
+  -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Store — Apex Topups</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#0b0f12" />
+
+  <style>
+    :root{
+      --accent:#ff7a18;
+      --muted:#98a0a6;
+      --bg:#071014;
+      --card:#0b1620;
+      --glass: rgba(255,255,255,0.02);
+      --radius:14px;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071014 0%, #071418 60%);color:#e6eef2;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+    .wrap{max-width:1100px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:100vh;}
+    .header{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .brand{display:flex;align-items:center;gap:12px;}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff9b43);display:grid;place-items:center;font-weight:800;color:#081018;}
+    .search-row{display:flex;gap:10px;align-items:center;}
+    .search{flex:1;display:flex;gap:8px;align-items:center;background:var(--glass);padding:8px;border-radius:10px;border:1px solid rgba(255,255,255,0.02);}
+    .search input{flex:1;background:transparent;border:0;color:inherit;padding:8px;outline:none;font-size:14px;}
+    .filters{display:flex;gap:8px;align-items:center;}
+    .btn{background:var(--accent);color:#081018;padding:8px 10px;border-radius:10px;border:none;cursor:pointer;font-weight:700;}
+    .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:12px;}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:14px;border:1px solid rgba(255,255,255,0.02);transition:transform .12s,box-shadow .12s;}
+    .card:hover{transform:translateY(-8px);box-shadow:0 18px 40px rgba(2,6,23,0.6);}
+    .thumb{height:120px;border-radius:10px;object-fit:cover;width:100%;background:linear-gradient(180deg,#0b1014,#071018);display:grid;place-items:center;color:var(--muted);font-weight:700;}
+    .pname{font-weight:700;margin-top:8px;}
+    .pdesc{color:var(--muted);font-size:13px;margin-top:6px;}
+    .price-row{display:flex;justify-content:space-between;align-items:center;margin-top:10px;}
+    .price{font-weight:800;color:var(--accent);}
+    .buy{background:linear-gradient(90deg,var(--accent),#ffc07a);padding:8px 10px;border-radius:10px;border:none;color:#081018;font-weight:800;cursor:pointer;}
+    .empty{padding:20px;text-align:center;color:var(--muted);background:var(--glass);border-radius:12px;}
+    @media (max-width:920px){ .grid{grid-template-columns:repeat(2,1fr);} }
+    @media (max-width:540px){ .grid{grid-template-columns:1fr;} .header{flex-direction:column;align-items:stretch;} .search-row{flex-direction:column;align-items:stretch;} }
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <div class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">AT</div>
+        <div>
+          <div style="font-weight:800">Apex Topups Store</div>
+          <div style="font-size:13px;color:var(--muted);">Fast, secure top-ups for games and wallets</div>
+        </div>
+      </div>
+
+      <div class="search-row" style="min-width:220px;max-width:640px;">
+        <div class="search" role="search" aria-label="Search products">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" style="opacity:0.8"><path d="M21 21l-4.35-4.35" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"></path><circle cx="11" cy="11" r="6" stroke="currentColor" stroke-width="1.5"></circle></svg>
+          <input id="search" placeholder="Search games, providers or SKUs" aria-label="Search products" />
+          <button id="clear-search" title="Clear search" style="background:transparent;border:0;color:var(--muted);cursor:pointer">✕</button>
+        </div>
+
+        <div class="filters">
+          <select id="category" style="background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px;border-radius:10px;color:inherit;">
+            <option value="">All categories</option>
+          </select>
+          <button class="btn" id="refresh">Refresh</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="status" style="min-height:28px;"></div>
+
+    <section id="products" aria-live="polite">
+      <div id="products-grid" class="grid"></div>
+      <div id="no-results" class="empty" style="display:none;margin-top:12px;">No products found.</div>
+    </section>
+
+    <!-- Footer placeholder for dynamic injection -->
+    <div id="footer-container" style="margin-top:12px;"></div>
+  </div>
+
+  <script>
+    /**
+     * Store page logic
+     * - Loads products from products.json (expected structure: [{id,name,category,price,currency,description,image,sku}] )
+     * - Fallback sample products used if fetch fails.
+     * - On "Buy", store chosen product to localStorage 'apex_selected_product' and redirect to payment.html
+     * - Products file is intended to be managed via GitHub for real updates.
+     */
+
+    (function(){
+      const grid = document.getElementById('products-grid');
+      const search = document.getElementById('search');
+      const category = document.getElementById('category');
+      const status = document.getElementById('status');
+      const noResults = document.getElementById('no-results');
+
+      const PRODUCTS_URL = 'products.json';
+
+      // Fallback products (used if products.json is missing)
+      const FALLBACK_PRODUCTS = [
+        { id: 'p_gems_100', name: 'Game Gems 100', category: 'Gems', price: 99, currency: 'NPR', description: '100 gems for popular games', image: '', sku: 'GEM100' },
+        { id: 'p_coins_500', name: 'Gold Coins 500', category: 'Coins', price: 199, currency: 'NPR', description: '500 gold coins', image: '', sku: 'COIN500' },
+        { id: 'p_mobile_100', name: 'Mobile Topup ₹100', category: 'Mobile', price: 100, currency: 'NPR', description: 'Instant mobile top-up', image: '', sku: 'MOB100' }
+      ];
+
+      // Utility functions
+      function formatCurrency(n){ return '₨' + Number(n || 0).toLocaleString(); }
+      function setStatus(msg, isError){ status.innerHTML = msg ? '<div style="color:' + (isError ? '#ffb4a6' : '#aef0c0') + ';">' + msg + '</div>' : ''; }
+
+      // Load footer dynamically
+      (async function loadFooter(){
+        const container = document.getElementById('footer-container');
+        try{
+          const res = await fetch('footer.html', {cache: "no-store"});
+          if(!res.ok) throw new Error('No footer');
+          container.innerHTML = await res.text();
+        } catch (e){
+          container.innerHTML = `<div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;padding-top:6px;">
+            © 2026 Apex Nepal Pvt Ltd | All rights reserved
+          </div>`;
+        }
+      })();
+
+      // Fetch products file
+      async function loadProducts(){
+        setStatus('Loading products…', false);
+        try{
+          const res = await fetch(PRODUCTS_URL + '?_=' + Date.now(), {cache: 'no-cache'});
+          if(!res.ok) throw new Error('products.json not found');
+          const data = await res.json();
+          if(!Array.isArray(data) || data.length === 0) throw new Error('No products');
+          setStatus('Products loaded', false);
+          return data;
+        } catch(e){
+          console.warn('Failed to load products.json, using fallback.', e);
+          setStatus('Using bundled products (products.json not found). Manage products via GitHub.', true);
+          return FALLBACK_PRODUCTS;
+        }
+      }
+
+      // Render category filter options
+      function populateCategories(items){
+        const cats = Array.from(new Set(items.map(i => i.category || 'Other')));
+        category.innerHTML = '<option value="">All categories</option>' + cats.map(c => `<option value="${c}">${c}</option>`).join('');
+      }
+
+      // Render products cards
+      function renderProducts(items){
+        grid.innerHTML = '';
+        if(!items || items.length === 0){
+          noResults.style.display = 'block';
+          return;
+        }
+        noResults.style.display = 'none';
+        items.forEach(p => {
+          const el = document.createElement('article');
+          el.className = 'card';
+          el.setAttribute('aria-label', p.name + ' — ' + (p.description || ''));
+          const img = p.image ? `<img class="thumb" src="${p.image}" alt="${p.name} image">` : `<div class="thumb">${p.name.split(' ').slice(0,2).map(s=>s[0]).join('')}</div>`;
+          el.innerHTML = `
+            ${img}
+            <div class="pname">${p.name}</div>
+            <div class="pdesc">${p.description || ''}</div>
+            <div class="price-row">
+              <div class="price">${formatCurrency(p.price)}</div>
+              <div>
+                <button class="buy" data-id="${p.id}">Buy</button>
+              </div>
+            </div>
+          `;
+          grid.appendChild(el);
+        });
+      }
+
+      // Filtering logic
+      function applyFilters(allItems){
+        let q = (search.value || '').trim().toLowerCase();
+        let cat = (category.value || '').trim();
+        let items = allItems.filter(it => {
+          let matchesQuery = !q || (it.name && it.name.toLowerCase().includes(q)) || (it.description && it.description.toLowerCase().includes(q)) || (it.sku && it.sku.toLowerCase().includes(q));
+          let matchesCat = !cat || (it.category === cat);
+          return matchesQuery && matchesCat;
+        });
+        renderProducts(items);
+      }
+
+      // Buy handler: save selected product and redirect to payment
+      function handleBuy(product, userspace=true){
+        try{
+          localStorage.setItem('apex_selected_product', JSON.stringify(product));
+          // Also store last viewed product for analytics-like demo
+          localStorage.setItem('apex_last_viewed_product', product.id || product.name);
+          window.location.href = 'payment.html';
+        } catch(e){
+          alert('Failed to select product: ' + (e.message || 'unknown'));
+        }
+      }
+
+      // Boot
+      (async function boot(){
+        const items = await loadProducts();
+        populateCategories(items);
+        renderProducts(items);
+
+        // Event listeners
+        document.addEventListener('click', (ev) => {
+          const buy = ev.target.closest('.buy');
+          if(buy){
+            const id = buy.getAttribute('data-id');
+            const product = items.find(it => it.id === id) || items[0];
+            handleBuy(product);
+          }
+        });
+
+        search.addEventListener('input', () => applyFilters(items));
+        category.addEventListener('change', () => applyFilters(items));
+        document.getElementById('refresh').addEventListener('click', async () => {
+          const reloaded = await loadProducts();
+          populateCategories(reloaded);
+          renderProducts(reloaded);
+        });
+        document.getElementById('clear-search').addEventListener('click', () => { search.value=''; applyFilters(items); search.focus(); });
+
+        // Keyboard: Enter focuses first buy button
+        search.addEventListener('keydown', (e) => {
+          if(e.key === 'Enter'){
+            e.preventDefault();
+            const firstBuy = document.querySelector('.buy');
+            if(firstBuy) firstBuy.click();
+          }
+        });
+      })();
+
+    })();
+  </script>
+
+  <!-- Global app behaviours and utilities -->
+  <script src="app.js" defer></script>
+</body>
+</html>
