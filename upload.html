@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!--
+    Apex Topups - Upload Payment Screenshot
+    File: upload.html
+
+    Description:
+      - Allows user to upload payment screenshot for a pending order (apex_pending_order).
+      - Converts the uploaded image to a data URL and stores it in localStorage as part of the order.
+      - Finalizes the order locally by adding it to apex_orders and creating a wallet transaction (local demo).
+      - Stores screenshot as data URL in the order object (key apex_orders contains array of orders).
+      - Mobile-first, dark theme with orange highlights, card-based layout.
+      - Dynamically injects footer.html into #footer-container (graceful fallback provided).
+      - Important comments included.
+
+    Notes about demo behaviour:
+      - This is a frontend-only demo. In production screenshots would be uploaded to a backend.
+      - For demo simplicity, submitting an order will create a debit transaction and update user's balance immediately.
+      - Passwords, transactions and all data are stored in localStorage (not secure).
+  -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Upload Payment — Apex Topups</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#0b0f12" />
+
+  <style>
+    :root{
+      --accent:#ff7a18;
+      --muted:#98a0a6;
+      --bg:#071014;
+      --card:#0b1620;
+      --glass: rgba(255,255,255,0.02);
+      --radius:14px;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071014 0%, #071418 60%);color:#e6eef2;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;-webkit-font-smoothing:antialiased;}
+    .wrap{max-width:980px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:12px;min-height:100vh;}
+    .header{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .brand{display:flex;align-items:center;gap:12px;}
+    .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff9b43);display:grid;place-items:center;font-weight:800;color:#081018;}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:14px;border-radius:14px;border:1px solid rgba(255,255,255,0.02);}
+    .grid{display:grid;grid-template-columns:1fr 320px;gap:12px;align-items:start;}
+    .muted{color:var(--muted);font-size:13px;}
+    .price{font-size:20px;font-weight:800;color:var(--accent);}
+    .btn{background:var(--accent);color:#081018;padding:10px 12px;border-radius:10px;border:none;cursor:pointer;font-weight:700;}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);padding:8px;border-radius:10px;}
+    .uploader{border:2px dashed rgba(255,255,255,0.04);padding:18px;border-radius:12px;display:flex;flex-direction:column;gap:10px;align-items:center;justify-content:center;background:rgba(255,255,255,0.01);}
+    .preview{width:100%;max-height:320px;border-radius:10px;overflow:hidden;background:rgba(0,0,0,0.3);display:grid;place-items:center;}
+    input[type="file"]{display:none;}
+    .note{background:rgba(255,255,255,0.02);padding:10px;border-radius:10px;margin-top:8px;color:var(--muted);}
+    .small{font-size:13px;}
+    .meta-row{display:flex;justify-content:space-between;gap:8px;align-items:center;}
+    @media (max-width:920px){ .grid{grid-template-columns:1fr;} .preview{max-height:220px;} }
+    @media (max-width:480px){ .logo{width:40px;height:40px;} .card{padding:12px;} }
+  </style>
+</head>
+<body>
+  <div class="wrap" role="main">
+    <div class="header">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">AT</div>
+        <div>
+          <div style="font-weight:800">Upload Payment Proof</div>
+          <div style="font-size:13px;color:var(--muted);">Attach screenshot of your payment for verification</div>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn-ghost" id="btn-back">← Back</button>
+        <button class="btn" id="btn-submit" disabled>Submit & Create Order</button>
+      </div>
+    </div>
+
+    <section class="card">
+      <div class="grid">
+        <!-- Left: uploader -->
+        <div>
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div class="small muted">Order</div>
+              <div id="product-title" style="font-weight:800">Loading…</div>
+            </div>
+            <div style="text-align:right;">
+              <div class="small muted">Amount</div>
+              <div id="product-amount" class="price">₨0</div>
+            </div>
+          </div>
+
+          <div style="margin-top:12px;">
+            <label class="uploader" id="drop-zone">
+              <input id="file-input" type="file" accept="image/*" />
+              <div style="display:flex;flex-direction:column;align-items:center;gap:8px;">
+                <div style="font-weight:700">Drag & drop your payment screenshot</div>
+                <div class="muted small">or click to choose an image (JPEG, PNG). Stored locally as data URL.</div>
+                <div style="margin-top:6px;">
+                  <button class="btn-ghost" id="btn-choose">Choose file</button>
+                </div>
+              </div>
+            </label>
+
+            <div class="preview" id="preview" style="margin-top:12px;">
+              <div class="muted">No image selected</div>
+            </div>
+
+            <div class="note">
+              <div class="small muted">Important: This demo stores screenshots in your browser (localStorage) as base64 data URLs.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: order summary -->
+        <aside>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div class="meta-row">
+              <div class="small muted">Order ID</div>
+              <div id="order-id" class="small">—</div>
+            </div>
+
+            <div style="padding:12px;border-radius:10px;background:rgba(255,255,255,0.015);">
+              <div class="small muted">Summary</div>
+              <div style="font-weight:800;font-size:18px;margin-top:8px;" id="summary-name">—</div>
+              <div class="small muted" id="summary-sku">SKU —</div>
+              <div style="margin-top:10px;font-weight:800;color:var(--accent);" id="summary-price">₨0</div>
+            </div>
+
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <button class="btn" id="btn-submit-2" disabled>Submit & Create Order</button>
+              <button class="btn-ghost" id="btn-cancel">Cancel</button>
+            </div>
+
+            <div class="note small muted">
+              After submission your order will appear in Orders and your wallet will be updated automatically (demo).
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <!-- Footer placeholder for dynamic injection -->
+    <div id="footer-container"></div>
+  </div>
+
+  <script>
+    /**
+     * Upload page script
+     * Flow:
+     *  - Load apex_pending_order from localStorage (created in payment.html)
+     *  - Let user attach a screenshot (FileReader -> data URL)
+     *  - On submit:
+     *      - Append screenshot data URL to order.screenshot
+     *      - Update order.status -> "submitted"
+     *      - Push/replace into apex_orders array
+     *      - Create a transaction entry in apex_transactions and update apex_users balance (demo behavior)
+     *      - Remove apex_pending_order
+     *      - Redirect to thank-you.html (or orders.html)
+     *
+     * All important steps are commented and defensive checks are performed.
+     */
+
+    (function(){
+      const fileInput = document.getElementById('file-input');
+      const dropZone = document.getElementById('drop-zone');
+      const preview = document.getElementById('preview');
+      const btnChoose = document.getElementById('btn-choose');
+      const btnSubmit = document.getElementById('btn-submit');
+      const btnSubmit2 = document.getElementById('btn-submit-2');
+      const btnBack = document.getElementById('btn-back');
+      const btnCancel = document.getElementById('btn-cancel');
+
+      // Utility helpers
+      function qs(sel){ return document.querySelector(sel); }
+      function formatCurrency(n){ return '₨' + Number(n || 0).toLocaleString(); }
+      function safeParse(key, fallback){ try{ return JSON.parse(localStorage.getItem(key) || 'null') || fallback; }catch(e){return fallback;} }
+      function saveJSON(key, value){ localStorage.setItem(key, JSON.stringify(value)); }
+
+      // Load footer dynamically
+      (async function loadFooter(){
+        const container = document.getElementById('footer-container');
+        try{
+          const res = await fetch('footer.html', {cache: "no-store"});
+          if(!res.ok) throw new Error('No footer');
+          container.innerHTML = await res.text();
+        } catch (e){
+          container.innerHTML = `<div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;padding-top:6px;">
+            © 2026 Apex Nepal Pvt Ltd | All rights reserved
+          </div>`;
+        }
+      })();
+
+      // Load pending order
+      let pending = null;
+      try { pending = JSON.parse(localStorage.getItem('apex_pending_order') || 'null'); } catch(e){ pending = null; }
+
+      if(!pending){
+        alert('No pending order found. Redirecting to store.');
+        setTimeout(() => window.location.href = 'store.html', 200);
+        return;
+      }
+
+      // Render meta
+      document.getElementById('product-title').textContent = pending.productName || 'Top-up';
+      document.getElementById('product-amount').textContent = formatCurrency(pending.price || 0);
+      document.getElementById('summary-name').textContent = pending.productName || 'Top-up';
+      document.getElementById('summary-sku').textContent = 'Product ID: ' + (pending.productId || '—');
+      document.getElementById('summary-price').textContent = formatCurrency(pending.price || 0);
+      document.getElementById('order-id').textContent = pending.id || '—';
+
+      // Load current user
+      const users = safeParse('apex_users', []);
+      const currentUser = localStorage.getItem('apex_current_user');
+      const userIndex = users.findIndex(u => u.username === currentUser);
+      const userObj = userIndex !== -1 ? users[userIndex] : null;
+
+      // If user missing, still allow submission as guest
+      if(!userObj){
+        console.warn('No user found for pending order; continuing as guest.');
+      }
+
+      // Image handling
+      let imgDataUrl = pending.screenshot || null;
+
+      function showPreview(dataUrl){
+        preview.innerHTML = '';
+        if(!dataUrl){
+          preview.innerHTML = '<div class="muted">No image selected</div>';
+          btnSubmit.disabled = true;
+          btnSubmit2.disabled = true;
+          return;
+        }
+        const img = document.createElement('img');
+        img.src = dataUrl;
+        img.style.maxWidth = '100%';
+        img.style.maxHeight = '320px';
+        img.style.display = 'block';
+        preview.appendChild(img);
+        btnSubmit.disabled = false;
+        btnSubmit2.disabled = false;
+      }
+
+      // If pending already has a screenshot, show it
+      if(pending.screenshot){
+        imgDataUrl = pending.screenshot;
+        showPreview(imgDataUrl);
+      }
+
+      btnChoose.addEventListener('click', (e) => {
+        e.preventDefault();
+        fileInput.click();
+      });
+
+      // File selection handler
+      fileInput.addEventListener('change', (ev) => {
+        const f = ev.target.files && ev.target.files[0];
+        if(f) processFile(f);
+      });
+
+      // Drag & drop support
+      ['dragenter','dragover'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault(); e.stopPropagation();
+          dropZone.style.borderColor = 'rgba(255,122,24,0.6)';
+        });
+      });
+      ['dragleave','drop'].forEach(evt => {
+        dropZone.addEventListener(evt, (e) => {
+          e.preventDefault(); e.stopPropagation();
+          dropZone.style.borderColor = 'transparent';
+        });
+      });
+      dropZone.addEventListener('drop', (e) => {
+        const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+        if(f) processFile(f);
+      });
+
+      // Process file -> convert to data URL
+      function processFile(file){
+        if(!file.type.startsWith('image/')){
+          alert('Please upload an image file (PNG, JPEG).');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = function(evt){
+          imgDataUrl = evt.target.result;
+          // For safety, ensure data URL not extremely large; demo accepts it anyway
+          showPreview(imgDataUrl);
+        };
+        reader.onerror = function(){
+          alert('Failed to read file.');
+        };
+        reader.readAsDataURL(file);
+      }
+
+      // Submission: attach screenshot to order and finalize locally
+      async function finalizeOrder(){
+        if(!imgDataUrl){
+          alert('Please attach a screenshot before submitting.');
+          return;
+        }
+
+        // Update pending order with screenshot and status
+        const now = new Date().toISOString();
+        const orderRecord = Object.assign({}, pending, {
+          screenshot: imgDataUrl,
+          status: 'submitted', // pending verification
+          submittedAt: now,
+        });
+
+        // Append to apex_orders (persist)
+        const orders = safeParse('apex_orders', []);
+        // Remove any existing order with same id (defensive)
+        const filtered = orders.filter(o => o.id !== orderRecord.id);
+        filtered.push(orderRecord);
+        saveJSON('apex_orders', filtered);
+
+        // Create a transaction and update user's balance (demo behavior):
+        // - Create transaction entry in apex_transactions
+        // - Subtract amount from user's balance and persist in apex_users
+        try {
+          const txs = safeParse('apex_transactions', []);
+          const tx = {
+            id: 'tx_' + Date.now() + Math.floor(Math.random()*9000),
+            type: 'order',
+            user: orderRecord.username,
+            orderId: orderRecord.id,
+            amount: -(Number(orderRecord.price) || 0),
+            note: 'Order payment (pending verification)',
+            createdAt: now
+          };
+          txs.push(tx);
+          saveJSON('apex_transactions', txs);
+
+          // Update user balance if found
+          if(userObj){
+            // Demo policy: subtract immediately to reflect wallet changes.
+            const newBalance = (Number(userObj.balance || 0) + Number(tx.amount));
+            users[userIndex].balance = newBalance;
+            saveJSON('apex_users', users);
+          }
+        } catch(e){
+          console.warn('Failed to create transaction: ', e);
+        }
+
+        // Clear apex_pending_order since it's finalized into apex_orders
+        localStorage.removeItem('apex_pending_order');
+        // Save reference to last submitted order for thank-you page
+        localStorage.setItem('apex_last_submitted_order', JSON.stringify(orderRecord));
+
+        // Friendly redirect to thank-you page (or orders)
+        window.location.href = 'thank-you.html';
+      }
+
+      // Button handlers
+      btnSubmit.addEventListener('click', finalizeOrder);
+      btnSubmit2.addEventListener('click', finalizeOrder);
+
+      btnBack.addEventListener('click', () => {
+        // go back to payment to allow adjustments
+        window.location.href = 'payment.html';
+      });
+
+      btnCancel.addEventListener('click', () => {
+        if(confirm('Cancel this pending order?')) {
+          localStorage.removeItem('apex_pending_order');
+          window.location.href = 'store.html';
+        }
+      });
+
+      // Also enable submission by pressing Enter when an image is loaded
+      document.addEventListener('keydown', (e) => {
+        if((e.key === 'Enter' || e.key === ' ') && (document.activeElement === btnSubmit || document.activeElement === btnSubmit2)){
+          e.preventDefault();
+          finalizeOrder();
+        }
+      });
+
+      // Accessibility: allow clicking the preview to open image in new tab
+      preview.addEventListener('click', () => {
+        if(imgDataUrl) window.open(imgDataUrl, '_blank');
+      });
+
+      // Preload if pending already had image
+      if(pending.screenshot){
+        showPreview(pending.screenshot);
+      }
+
+    })();
+  </script>
+
+  <!-- Global app behaviours and utilities -->
+  <script src="app.js" defer></script>
+</body>
+</html>
