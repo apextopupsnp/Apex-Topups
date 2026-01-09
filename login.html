@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!--
+    Apex Topups - Login Page
+    File: login.html
+    Description: Frontend-only login with validation. Stores session in localStorage under "apex_current_user".
+    Notes:
+      - Links to global style.css and app.js
+      - Dynamically injects footer.html into #footer-container
+      - Accessible, mobile-first, dark theme with orange highlights
+  -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Login — Apex Topups</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#0b0f12" />
+  <style>
+    /* Minimal page-specific styles so page remains polished even before style.css loads */
+    :root{ --accent:#ff7a18; --muted:#98a0a6; --bg:#071014; --card:#0b1620; --radius:12px; }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071014 0%, #071418 60%);color:#e6eef2;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;}
+    .wrap{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;}
+    .card{width:100%;max-width:420px;background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:20px;border-radius:14px;box-shadow:0 10px 30px rgba(2,6,23,0.7);}
+    .brand-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+    .logo{width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#ff9b43);display:grid;place-items:center;font-weight:800;color:#081018;}
+    h1{margin:0;font-size:18px;}
+    p.lead{margin:6px 0 18px;color:var(--muted);font-size:13px;}
+    form{display:flex;flex-direction:column;gap:12px;}
+    label{font-size:13px;color:var(--muted);}
+    input[type="text"],input[type="email"],input[type="password"]{width:100%;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;font-size:14px;outline:none;transition:box-shadow .12s;}
+    input:focus{box-shadow:0 6px 18px rgba(255,122,24,0.06);border-color:rgba(255,122,24,0.12);}
+    .row{display:flex;justify-content:space-between;align-items:center;}
+    .btn{background:var(--accent);color:#081018;padding:10px 14px;border-radius:10px;border:none;font-weight:600;cursor:pointer;box-shadow:0 8px 24px rgba(255,122,24,0.08);transition:transform .12s;}
+    .btn:active{transform:translateY(1px);}
+    .btn-ghost{background:transparent;border:1px solid rgba(255,255,255,0.04);color:var(--muted);}
+    .muted{color:var(--muted);font-size:13px;}
+    .error{background:#3a0b00;color:#ffcfbf;padding:8px 10px;border-radius:10px;font-size:13px;}
+    .small{font-size:13px;color:var(--muted);}
+    a.link{color:var(--accent);text-decoration:none;font-weight:600}
+    .footer-strip{margin-top:12px;text-align:center;font-size:12px;color:var(--muted)}
+    @media (max-width:420px){ .card{padding:16px;border-radius:12px;} .logo{width:44px;height:44px;} }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <main class="card" role="main" aria-labelledby="login-title">
+      <div class="brand-row">
+        <div class="logo" aria-hidden="true">AT</div>
+        <div>
+          <h1 id="login-title">Apex Topups</h1>
+          <p class="lead">Welcome back — sign in to continue to your dashboard.</p>
+        </div>
+      </div>
+
+      <!-- Error / status area -->
+      <div id="status" aria-live="polite" style="min-height:36px;"></div>
+
+      <!-- Login Form -->
+      <form id="login-form" novalidate autocomplete="on">
+        <div>
+          <label for="login-identifier">Username or Email</label>
+          <input id="login-identifier" name="identifier" type="text" placeholder="you@example.com or username" required />
+        </div>
+
+        <div>
+          <label for="login-password">Password</label>
+          <input id="login-password" name="password" type="password" placeholder="••••••••" required minlength="4" />
+        </div>
+
+        <div class="row" style="align-items:center;">
+          <div style="display:flex;gap:8px;align-items:center;">
+            <input id="remember" type="checkbox" style="width:16px;height:16px;border-radius:4px;" />
+            <label for="remember" class="small">Remember me</label>
+          </div>
+          <a href="#" id="forgot" class="small muted">Forgot?</a>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+          <button class="btn" type="submit">Sign in</button>
+          <a class="btn btn-ghost" href="signup.html" role="button">Create account</a>
+        </div>
+
+        <div class="footer-strip">
+          <p class="muted">New to Apex Topups? <a class="link" href="signup.html">Create an account</a></p>
+        </div>
+      </form>
+
+      <!-- Footer placeholder for dynamic injection -->
+      <div id="footer-container" style="margin-top:12px;"></div>
+    </main>
+  </div>
+
+  <script>
+    /**
+     * Login page script
+     * - Uses localStorage key "apex_users" to find registered users (array of {username,email,password,balance,referral})
+     * - On successful login, saves "apex_current_user" = username (string) and redirects to home.html
+     * - If no users exist, suggests signup
+     * - Frontend-only validation and friendly messages
+     */
+
+    (function(){
+      const form = document.getElementById('login-form');
+      const status = document.getElementById('status');
+      const forgot = document.getElementById('forgot');
+
+      function setStatus(html, isError){
+        status.innerHTML = html ? ('<div class="'+(isError ? 'error' : 'small')+'">'+html+'</div>') : '';
+      }
+
+      // Load footer dynamically for consistent layout (graceful fallback)
+      (async function loadFooter(){
+        const container = document.getElementById('footer-container');
+        try{
+          const res = await fetch('footer.html', {cache: "no-store"});
+          if(!res.ok) throw new Error('No footer');
+          container.innerHTML = await res.text();
+        } catch (e){
+          container.innerHTML = `<div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;padding-top:6px;">
+            © 2026 Apex Nepal Pvt Ltd | All rights reserved
+          </div>`;
+        }
+      })();
+
+      // Basic client-side email checker
+      function looksLikeEmail(v){
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      }
+
+      // Retrieve users from localStorage (returns array)
+      function getUsers(){
+        try{
+          const raw = localStorage.getItem('apex_users') || '[]';
+          return JSON.parse(raw);
+        } catch (e){
+          return [];
+        }
+      }
+
+      // Find user by username or email
+      function findUser(identifier){
+        const users = getUsers();
+        return users.find(u => (u.username && u.username.toLowerCase() === identifier.toLowerCase()) || (u.email && u.email.toLowerCase() === identifier.toLowerCase()));
+      }
+
+      // Show friendly message if no users exist
+      if(getUsers().length === 0){
+        setStatus('No accounts found on this device. Create one in <a href="signup.html" class="link">Signup</a>.', false);
+      }
+
+      // Form submit handler
+      form.addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        setStatus('');
+        const id = document.getElementById('login-identifier').value.trim();
+        const pass = document.getElementById('login-password').value;
+
+        // Client-side validation
+        if(!id){
+          setStatus('Please enter your username or email.', true);
+          return;
+        }
+        if(!pass || pass.length < 4){
+          setStatus('Please enter a valid password (min 4 characters).', true);
+          return;
+        }
+
+        const user = findUser(id);
+        if(!user){
+          setStatus('No account found for that username/email. <a href="signup.html" class="link">Sign up</a>.', true);
+          return;
+        }
+
+        // Note: This demo stores passwords in plain text in localStorage (no backend). In production, NEVER do this.
+        if(user.password !== pass){
+          setStatus('Incorrect password. Try again or reset your password.', true);
+          return;
+        }
+
+        // Successful login: set session info
+        try{
+          // Save current user (we store username for lookup)
+          localStorage.setItem('apex_current_user', user.username);
+          // Optionally persist "remember" choice
+          const remember = document.getElementById('remember').checked;
+          if(remember){
+            localStorage.setItem('apex_last_user', user.username);
+          } else {
+            localStorage.removeItem('apex_last_user');
+          }
+
+          // Friendly success then redirect
+          setStatus('Welcome back, ' + (user.displayName || user.username) + ' — redirecting…', false);
+          setTimeout(() => { window.location.href = 'home.html'; }, 700);
+        } catch (e){
+          setStatus('Login failed: ' + (e.message || 'unknown error'), true);
+        }
+      });
+
+      // Forgot password handler (frontend-only)
+      forgot.addEventListener('click', (ev) => {
+        ev.preventDefault();
+        const id = document.getElementById('login-identifier').value.trim();
+        if(!id){
+          setStatus('Enter your username or email above to receive a password hint (local only).', false);
+          return;
+        }
+        const user = findUser(id);
+        if(!user){
+          setStatus('No account found for that identifier.', true);
+          return;
+        }
+        // Provide a gentle hint (never show full password)
+        const hint = user.password ? 'Hint: starts with "'+user.password[0]+'"' : 'No password stored.';
+        setStatus('Password hint: ' + hint, false);
+      });
+
+      // Pre-fill last user if present
+      (function prefill(){
+        try{
+          const last = localStorage.getItem('apex_last_user');
+          if(last){
+            const user = findUser(last);
+            if(user){
+              document.getElementById('login-identifier').value = user.email || user.username || last;
+            }
+          }
+        } catch(e){}
+      })();
+
+    })();
+  </script>
+
+  <!-- Global app behaviours and utilities (loaded after page) -->
+  <script src="app.js" defer></script>
+</body>
+  </html>
