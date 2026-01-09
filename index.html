@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!--
+    Apex Topups - Splash / Loader Page
+    File: index.html
+    Description: Lightweight splash screen that auto-redirects to home.html.
+    Notes:
+      - Links to external style.css and app.js (generated later).
+      - Tries to dynamically inject footer.html into #footer-container.
+      - Mobile-first and accessible.
+  -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0f12" />
+  <title>Apex Topups — Loading…</title>
+
+  <!-- Global stylesheet (will be provided as style.css) -->
+  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    /* Minimal in-file styles for the splash to guarantee proper look even if style.css not yet loaded */
+    :root{
+      --bg:#071014;
+      --card:#0b1620;
+      --muted:#98a0a6;
+      --accent:#ff7a18; /* orange highlight */
+      --glass: rgba(255,255,255,0.03);
+      --radius:14px;
+      --max-width:980px;
+      --brand-font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+
+    html,body{
+      height:100%;
+      margin:0;
+      font-family:var(--brand-font);
+      background: linear-gradient(180deg,#071014 0%, #071418 60%);
+      color:#e6eef2;
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+    }
+
+    .container{
+      width:clamp(300px,92%,720px);
+      max-width:var(--max-width);
+      display:flex;
+      flex-direction:column;
+      gap:20px;
+      align-items:center;
+      padding:28px;
+      border-radius:20px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      box-shadow: 0 6px 30px rgba(2,6,23,0.7), inset 0 1px 0 rgba(255,255,255,0.02);
+      backdrop-filter: blur(6px) saturate(120%);
+    }
+
+    .brand {
+      display:flex;
+      align-items:center;
+      gap:14px;
+      margin-top:6px;
+    }
+
+    .logo {
+      width:72px;
+      height:72px;
+      background: linear-gradient(135deg,var(--accent), #ff9b43);
+      border-radius:16px;
+      display:grid;
+      place-items:center;
+      color:#081018;
+      font-weight:800;
+      font-size:22px;
+      box-shadow: 0 6px 18px rgba(255,122,24,0.12);
+    }
+
+    .title {
+      display:flex;
+      flex-direction:column;
+      gap:2px;
+      text-align:left;
+    }
+
+    .title h1{
+      margin:0;
+      font-size:18px;
+      letter-spacing:0.2px;
+    }
+
+    .title p{
+      margin:0;
+      color:var(--muted);
+      font-size:13px;
+    }
+
+    .loader {
+      width:100%;
+      max-width:560px;
+      margin-top:8px;
+      display:flex;
+      gap:12px;
+      align-items:center;
+    }
+
+    .progress {
+      flex:1;
+      height:12px;
+      background:var(--glass);
+      border-radius:999px;
+      overflow:hidden;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+    }
+
+    .bar {
+      height:100%;
+      width:0%;
+      background: linear-gradient(90deg,var(--accent), #ffc07a);
+      border-radius:999px;
+      transition: width 1s cubic-bezier(.2,.9,.3,1);
+      box-shadow: 0 4px 14px rgba(255,122,24,0.12);
+    }
+
+    .meta {
+      width:78px;
+      text-align:right;
+      font-size:13px;
+      color:var(--muted);
+    }
+
+    .skip {
+      margin-top:6px;
+      background:transparent;
+      border:1px solid rgba(255,255,255,0.04);
+      color:var(--muted);
+      padding:8px 12px;
+      border-radius:10px;
+      font-size:13px;
+      cursor:pointer;
+      transition: all .18s ease;
+    }
+
+    .skip:hover { transform:translateY(-2px); color:#fff; border-color:rgba(255,255,255,0.08); }
+
+    .powered {
+      margin-top:8px;
+      font-size:12px;
+      color:var(--muted);
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:center;
+    }
+
+    /* small screen adjustments */
+    @media (max-width:420px){
+      .logo{ width:64px; height:64px; font-size:20px; border-radius:12px; }
+      .title h1{ font-size:16px; }
+      .container{ padding:18px; border-radius:16px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="container" role="main" aria-labelledby="loading-title">
+    <div class="brand" aria-hidden="false">
+      <div class="logo" aria-hidden="true">AT</div>
+      <div class="title">
+        <h1 id="loading-title">Apex Topups</h1>
+        <p>Fast. Secure. Nepal's trusted top-up partner.</p>
+      </div>
+    </div>
+
+    <div class="loader" aria-hidden="false">
+      <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="bar" id="splash-bar"></div>
+      </div>
+      <div class="meta" id="splash-percent">0%</div>
+    </div>
+
+    <button class="skip" id="skip-btn" aria-label="Skip splash and go to dashboard">Skip</button>
+
+    <div class="powered" aria-hidden="true">
+      <span style="color:var(--muted)">© 2026 Apex Nepal Pvt Ltd</span>
+      <span style="opacity:0.6">•</span>
+      <span style="color:var(--muted)">Powered by Apex Nepal Pvt Ltd</span>
+    </div>
+
+    <!-- Footer placeholder - footer.html will be injected here dynamically by app.js -->
+    <div id="footer-container" style="width:100%; margin-top:8px;"></div>
+  </main>
+
+  <!-- Main app logic (app.js will be provided later). For now minimal inline bootstrapping to ensure redirect works. -->
+  <script>
+    /* 
+      Splash behaviour:
+      - Progress animation to 100% then redirect to home.html
+      - Skip button to immediately redirect
+      - Tries to load footer.html into #footer-container (fallback if fetch fails).
+    */
+
+    (function(){
+      const BAR = document.getElementById('splash-bar');
+      const PCT = document.getElementById('splash-percent');
+      const SKIP = document.getElementById('skip-btn');
+
+      let pct = 0;
+      let duration = 2200; // total animation time in ms
+      const start = performance.now();
+
+      // animate progress smoothly to 100% then redirect
+      function step(now){
+        const elapsed = now - start;
+        const progress = Math.min(1, elapsed / duration);
+        pct = Math.round(progress * 100);
+        BAR.style.width = pct + '%';
+        PCT.textContent = pct + '%';
+        BAR.setAttribute('aria-valuenow', pct);
+
+        if(progress < 1){
+          requestAnimationFrame(step);
+        } else {
+          // small delay to let users see 100%
+          setTimeout(() => { gotoHome(); }, 400);
+        }
+      }
+      requestAnimationFrame(step);
+
+      // Redirect helper
+      function gotoHome(){
+        try {
+          // If user is on maintenance mode (config in localStorage later), app.js will handle; here we do quick redirect.
+          window.location.href = 'home.html';
+        } catch (e) {
+          console.error('Redirect failed', e);
+        }
+      }
+
+      SKIP.addEventListener('click', () => gotoHome());
+
+      // Try to inject footer if footer.html is present (dynamic footer requirement)
+      (async function loadFooter(){
+        const container = document.getElementById('footer-container');
+        if(!container) return;
+        try{
+          const res = await fetch('footer.html', {cache: "no-store"});
+          if(!res.ok) throw new Error('No footer');
+          const html = await res.text();
+          container.innerHTML = html;
+        } catch (e){
+          // Fallback footer if dynamic file is missing (keeps the page professional)
+          container.innerHTML = `<footer style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;padding-top:10px;">
+            © 2026 Apex Nepal Pvt Ltd | All rights reserved
+          </footer>`;
+        }
+      })();
+
+      // Accessibility: keyboard skip using Enter or Space on focused skip
+      SKIP.addEventListener('keydown', (ev) => {
+        if(ev.key === 'Enter' || ev.key === ' ') {
+          ev.preventDefault();
+          gotoHome();
+        }
+      });
+    })();
+  </script>
+
+  <!-- Link to the main app script for global functionality (created later) -->
+  <script src="app.js" defer></script>
+</body>
+  </html>
