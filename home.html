@@ -1,0 +1,330 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <!--
+    Apex Topups - Home / Dashboard
+    File: home.html
+
+    Description:
+      - Main dashboard and navigation for Apex Topups (frontend-only).
+      - Reads current user from localStorage key "apex_current_user".
+      - Shows quick summary: balance, orders count, recent transactions, offers.
+      - Provides prominent navigation cards to store, wallet, upload, orders, draw, referral, profile, settings.
+      - Dynamically injects footer.html into #footer-container.
+      - Mobile-first, dark theme with orange highlights, card-based layout.
+      - Uses app.js (global logic) for shared helpers; page contains small inline logic for dashboard rendering.
+  -->
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Home — Apex Topups</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="theme-color" content="#0b0f12" />
+
+  <style>
+    /* Page-specific minimal styling to ensure a polished look pre-style.css */
+    :root{
+      --accent:#ff7a18;
+      --muted:#98a0a6;
+      --bg:#071014;
+      --card:#0b1620;
+      --glass: rgba(255,255,255,0.03);
+      --radius:14px;
+    }
+    html,body{height:100%;margin:0;background:linear-gradient(180deg,#071014 0%, #071418 60%);color:#e6eef2;font-family:Inter,system-ui,Segoe UI,Roboto,Arial;-webkit-font-smoothing:antialiased;}
+    .wrap{min-height:100vh;padding:18px;display:flex;flex-direction:column;gap:14px;max-width:1100px;margin:0 auto;}
+    header.header{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .brand{display:flex;align-items:center;gap:12px;}
+    .logo{width:52px;height:52px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#ff9b43);display:grid;place-items:center;font-weight:800;color:#081018;}
+    .greeting h2{margin:0;font-size:16px;}
+    .greeting p{margin:0;color:var(--muted);font-size:13px;}
+    .top-actions{display:flex;gap:8px;align-items:center;}
+    .icon-btn{background:transparent;border:1px solid rgba(255,255,255,0.04);padding:8px 10px;border-radius:10px;color:var(--muted);cursor:pointer;}
+    .card-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:6px;}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01));padding:12px;border-radius:14px;box-shadow:0 8px 26px rgba(2,6,23,0.6);}
+    .balance{display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .balance .left{display:flex;flex-direction:column;}
+    .balance .amount{font-size:20px;font-weight:700;color:var(--accent);}
+    .quick-links{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+    .link-card{background:var(--glass);padding:10px;border-radius:12px;text-align:center;cursor:pointer;border:1px solid rgba(255,255,255,0.02);transition:transform .12s, box-shadow .12s;}
+    .link-card:hover{transform:translateY(-6px);box-shadow:0 10px 30px rgba(0,0,0,0.45);}
+    .small{font-size:13px;color:var(--muted);}
+    .muted{color:var(--muted);}
+    .orders-list{display:flex;flex-direction:column;gap:8px;margin-top:8px;}
+    .order-item{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:10px;background:rgba(255,255,255,0.015);border-radius:10px;border:1px solid rgba(255,255,255,0.02);}
+    .order-item .meta{display:flex;flex-direction:column;}
+    .cta{background:var(--accent);color:#081018;padding:8px 10px;border-radius:10px;border:none;cursor:pointer;font-weight:700;}
+    footer.small-foot{margin-top:12px;text-align:center;color:var(--muted);font-size:12px;}
+
+    @media (max-width:720px){
+      .card-grid{grid-template-columns:1fr;}
+      .quick-links{grid-template-columns:repeat(3,1fr);gap:8px;}
+      .brand .greeting h2{font-size:15px;}
+    }
+    @media (max-width:420px){
+      .quick-links{grid-template-columns:repeat(3,1fr);gap:6px;}
+      .logo{width:44px;height:44px;border-radius:10px;}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="header" role="banner">
+      <div class="brand">
+        <div class="logo" aria-hidden="true">AT</div>
+        <div class="greeting">
+          <h2 id="greet">Welcome, User</h2>
+          <p id="greet-sub" class="small muted">Good to see you. Here’s your quick overview.</p>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <button id="btn-notif" class="icon-btn" title="Notifications">🔔</button>
+        <button id="btn-settings" class="icon-btn" title="Settings">⚙️</button>
+        <button id="btn-logout" class="icon-btn" title="Logout">⎋</button>
+      </div>
+    </header>
+
+    <!-- Summary cards -->
+    <section class="card-grid" aria-labelledby="summary-heading">
+      <div class="card" id="card-balance" role="region" aria-label="wallet balance">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="small muted">Wallet Balance</div>
+            <div class="amount" id="balance-amount">₨0</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="small muted">Transactions</div>
+            <div id="txn-count" style="font-weight:700">0</div>
+          </div>
+        </div>
+
+        <div class="quick-links" style="margin-top:12px;">
+          <div class="link-card" data-href="wallet.html">Wallet</div>
+          <div class="link-card" data-href="store.html">Store</div>
+          <div class="link-card" data-href="upload.html">Upload</div>
+        </div>
+      </div>
+
+      <div class="card" id="card-orders" role="region" aria-label="orders">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <div>
+            <div class="small muted">Orders</div>
+            <div style="font-weight:700" id="orders-count">0</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="small muted">Lucky Draw</div>
+            <div><button class="cta" id="btn-draw">Try</button></div>
+          </div>
+        </div>
+
+        <div style="margin-top:10px;">
+          <div class="small muted">Recent orders</div>
+          <div id="recent-orders" class="orders-list">
+            <!-- populated by JS -->
+          </div>
+          <div style="margin-top:10px; text-align:right;">
+            <a href="orders.html" class="small link" style="color:var(--accent);text-decoration:none;font-weight:700">View all →</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Navigation / features -->
+    <section class="card" aria-labelledby="features-heading">
+      <h3 id="features-heading" style="margin:0 0 10px 0;">Quick actions</h3>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;">
+        <div class="link-card" data-href="store.html">Top-up</div>
+        <div class="link-card" data-href="payment.html">Pay (QR)</div>
+        <div class="link-card" data-href="orders.html">My Orders</div>
+        <div class="link-card" data-href="wallet.html">Transactions</div>
+        <div class="link-card" data-href="draw.html">Lucky Draw</div>
+        <div class="link-card" data-href="offers.html">Offers</div>
+        <div class="link-card" data-href="referral.html">Referral</div>
+        <div class="link-card" data-href="profile.html">Profile</div>
+      </div>
+    </section>
+
+    <!-- Offers / promotions -->
+    <section class="card" id="offers-card" aria-labelledby="offers-heading">
+      <h3 id="offers-heading" style="margin:0 0 10px 0;">Special offers</h3>
+      <div id="offers-list" style="display:flex;gap:10px;overflow:auto;padding-bottom:6px;">
+        <!-- Offer chips will be added here -->
+      </div>
+    </section>
+
+    <!-- Footer placeholder for dynamic injection -->
+    <div id="footer-container"></div>
+
+    <!-- small copyright fallback -->
+    <footer class="small-foot">© 2026 Apex Nepal Pvt Ltd | All rights reserved</footer>
+  </div>
+
+  <script>
+    /**
+     * Home page script
+     * - Loads current user and displays summary info
+     * - Loads recent orders and transactions from localStorage keys:
+     *    apex_users (per-user data), apex_orders (global), apex_transactions (global)
+     * - Quick navigation via data-href attributes
+     * - Provides logout functionality
+     *
+     * Important:
+     *  - All data is localStorage-based (no backend)
+     *  - This script tries to be defensive: if no user found, redirect to login.html
+     */
+
+    (function(){
+      // Helpers
+      function qs(sel, el=document) { return el.querySelector(sel); }
+      function qsa(sel, el=document) { return Array.from(el.querySelectorAll(sel)); }
+      function formatCurrency(n){ return '₨' + Number(n || 0).toLocaleString(); }
+      function safeParse(key, fallback){
+        try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; } catch(e){ return fallback; }
+      }
+
+      // Try to load dynamic footer (graceful fallback)
+      (async function loadFooter(){
+        const container = document.getElementById('footer-container');
+        try{
+          const res = await fetch('footer.html', {cache: "no-store"});
+          if(!res.ok) throw new Error('No footer');
+          container.innerHTML = await res.text();
+        } catch (e){
+          container.innerHTML = `<div style="font-size:12px;color:rgba(255,255,255,0.6);text-align:center;padding-top:6px;">
+            © 2026 Apex Nepal Pvt Ltd | All rights reserved
+          </div>`;
+        }
+      })();
+
+      // Navigation shortcuts
+      document.addEventListener('click', (e) => {
+        const target = e.target.closest('[data-href]');
+        if(target){
+          const href = target.getAttribute('data-href');
+          if(href) window.location.href = href;
+        }
+      });
+
+      // Buttons
+      qs('#btn-logout').addEventListener('click', () => {
+        localStorage.removeItem('apex_current_user');
+        window.location.href = 'login.html';
+      });
+      qs('#btn-settings').addEventListener('click', () => window.location.href = 'settings.html');
+      qs('#btn-notif').addEventListener('click', () => alert('Notifications are managed locally in this demo.'));
+
+      qs('#btn-draw').addEventListener('click', () => {
+        // Quick access to lucky draw
+        window.location.href = 'draw.html';
+      });
+
+      // Main render
+      const current = localStorage.getItem('apex_current_user');
+      if(!current){
+        // No session: forward to login
+        setTimeout(() => window.location.href = 'login.html', 200);
+        return;
+      }
+
+      // Load users and find current user object
+      const users = safeParse('apex_users', []);
+      const user = users.find(u => u.username === current);
+      if(!user){
+        // User record missing; redirect to login
+        localStorage.removeItem('apex_current_user');
+        setTimeout(() => window.location.href = 'login.html', 200);
+        return;
+      }
+
+      // Display user greeting and balance
+      qs('#greet').textContent = 'Welcome, ' + (user.displayName || user.username);
+      qs('#greet-sub').textContent = (user.email || '') + ' • Joined ' + (new Date(user.createdAt || Date.now()).toLocaleDateString());
+
+      // Balance and transactions
+      qs('#balance-amount').textContent = formatCurrency(user.balance || 0);
+      const txns = safeParse('apex_transactions', []); // global transaction list
+      qs('#txn-count').textContent = (txns.filter(t => t.to === user.username || t.from === user.username).length) || 0;
+
+      // Orders
+      const orders = safeParse('apex_orders', []).filter(o => o.username === user.username);
+      qs('#orders-count').textContent = orders.length;
+      const recentContainer = qs('#recent-orders');
+      recentContainer.innerHTML = '';
+      const recent = orders.slice().reverse().slice(0,4);
+      if(recent.length === 0){
+        recentContainer.innerHTML = '<div class="small muted">No recent orders yet — visit the store to make a purchase.</div>';
+      } else {
+        recent.forEach(o => {
+          const div = document.createElement('div');
+          div.className = 'order-item';
+          div.innerHTML = `
+            <div class="meta">
+              <div style="font-weight:700">${o.productName || 'Top-up'}</div>
+              <div class="small muted">${new Date(o.createdAt).toLocaleString()}</div>
+            </div>
+            <div style="text-align:right;">
+              <div style="font-weight:700">${formatCurrency(o.price)}</div>
+              <div class="small muted">${o.status || 'pending'}</div>
+            </div>
+          `;
+          recentContainer.appendChild(div);
+        });
+      }
+
+      // Load offers from config or localStorage (graceful)
+      (function loadOffers(){
+        // Offers can be defined in window.APEX_CONFIG.offers (if config.js present)
+        let offers = [];
+        if(window.APEX_CONFIG && Array.isArray(window.APEX_CONFIG.offers)){
+          offers = window.APEX_CONFIG.offers;
+        } else {
+          try {
+            offers = JSON.parse(localStorage.getItem('apex_offers') || '[]');
+          } catch(e){ offers = []; }
+        }
+
+        const offersList = qs('#offers-list');
+        offersList.innerHTML = '';
+        if(!offers || offers.length === 0){
+          // default sample offers
+          offers = [
+            { title: '10% off on mobile topups', subtitle: 'Use code MOBILE10', color:'#1f2937' },
+            { title: 'Buy ₹500, get ₹25 bonus', subtitle: 'Limited time', color:'#162c3a' }
+          ];
+        }
+
+        offers.forEach(o => {
+          const chip = document.createElement('div');
+          chip.style.minWidth = '180px';
+          chip.style.padding = '10px';
+          chip.style.borderRadius = '12px';
+          chip.style.background = o.color || 'rgba(255,255,255,0.02)';
+          chip.style.border = '1px solid rgba(255,255,255,0.02)';
+          chip.innerHTML = `<div style="font-weight:700">${o.title}</div><div class="small muted">${o.subtitle || ''}</div>`;
+          offersList.appendChild(chip);
+        });
+      })();
+
+      // Listen for storage changes from other tabs and update balance/orders dynamically
+      window.addEventListener('storage', (ev) => {
+        if(ev.key === 'apex_users' || ev.key === 'apex_orders' || ev.key === 'apex_transactions'){
+          // Simple reload of data
+          setTimeout(() => { location.reload(); }, 200);
+        }
+      });
+
+      // Accessibility: keyboard shortcuts
+      document.addEventListener('keydown', (e) => {
+        if(e.key === 'g' && (e.ctrlKey || e.metaKey)) {
+          e.preventDefault();
+          window.location.href = 'store.html';
+        }
+      });
+
+    })();
+  </script>
+
+  <!-- Global app behaviours and utilities -->
+  <script src="app.js" defer></script>
+</body>
+</html>
